@@ -19,7 +19,9 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
 .chip small { font-size: 10.5px; color: #8fe3a8; font-weight: 600; }
 .chip small.neg { color: #ff9a8a; }
 .chip.grow { flex: 1; min-width: 0; overflow: hidden; }
-.chip.grow small { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.mcol { display: flex; flex-direction: column; line-height: 1.08; min-width: 0; }
+.mcol b { font-size: 14px; }
+.mcol small { font-size: 9.5px; }
 .chip.lvl { background: linear-gradient(135deg, #f5b83d, #e8892a); padding-right: 10px; position: relative; }
 .chip.lvl .star { font-size: 15px; }
 .chip.lvl b { font-size: 16px; }
