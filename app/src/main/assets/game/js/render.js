@@ -6,8 +6,9 @@
   var R = CB.render = {};
   var cv, ctx, dpr = 1, vw = 0, vh = 0;
   var cam = R.cam = { x: 0, y: N * HH, z: 0.85, vx: 0, vy: 0 };
-  var CH = 16, NCH = N / CH, chunks = [];
-  var cars = [], roadList = [], roadDirty = true, smoke = [], floats = [];
+  /* zemin + yollar önbelleğe alınır: uzak görünüm için büyük, yakın görünüm için keskin parçalar */
+  var LOD = [{ n: 16, sc: 1, map: {} }, { n: 8, sc: 1.5, map: {} }], chunkCount = 0;
+  var cars = [], roadList = [], badRoads = [], roadDirty = true, smoke = [], floats = [];
   var frame = 0, objs = [];
   R.ghost = null; R.sel = null; R.overlay = null; R.expand = false; R.night = 0;
 
@@ -17,16 +18,19 @@
     CB.on('terrain', function (e) { roadDirty = true; dirtyChunks(e.x - 1, e.y - 1, e.x + 4, e.y + 4); });
     CB.on('region', function () { roadDirty = true; });
   };
-  R.reset = function () { chunks = []; cars = []; smoke = []; floats = []; roadDirty = true; R.sel = null; R.ghost = null; };
+  R.reset = function () { LOD[0].map = {}; LOD[1].map = {}; chunkCount = 0; cars = []; smoke = []; floats = []; roadDirty = true; R.sel = null; R.ghost = null; };
   R.resize = function () {
-    dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
     vw = window.innerWidth; vh = window.innerHeight;
     cv.width = Math.round(vw * dpr); cv.height = Math.round(vh * dpr);
     cv.style.width = vw + 'px'; cv.style.height = vh + 'px';
   };
   function dirtyChunks(x0, y0, x1, y1) {
-    for (var cy = Math.max(0, (y0 / CH) | 0); cy <= Math.min(NCH - 1, (y1 / CH) | 0); cy++)
-      for (var cx = Math.max(0, (x0 / CH) | 0); cx <= Math.min(NCH - 1, (x1 / CH) | 0); cx++) { var c = chunks[cx + cy * NCH]; if (c) c.dirty = true; }
+    for (var l = 0; l < LOD.length; l++) {
+      var L = LOD[l];
+      for (var cy = Math.max(0, Math.floor(y0 / L.n)); cy <= Math.floor(y1 / L.n); cy++)
+        for (var cx = Math.max(0, Math.floor(x0 / L.n)); cx <= Math.floor(x1 / L.n); cx++) { var c = L.map[cx + cy * 64]; if (c) c.dirty = true; }
+    }
   }
 
   /* ---------- koordinat ---------- */
@@ -67,17 +71,35 @@
 
   /* ---------- zemin ---------- */
   function gvar(x, y) { return (CB.hash2(x, y, 5) * 4) | 0; }
-  function buildChunk(cx, cy) {
-    var c = chunks[cx + cy * NCH];
-    if (!c) { c = chunks[cx + cy * NCH] = { c: document.createElement('canvas'), dirty: true }; c.c.width = CH * TW + 8; c.c.height = CH * TH + 8; }
-    var g = c.c.getContext('2d'), S = CB.sim.S;
-    g.clearRect(0, 0, c.c.width, c.c.height);
-    for (var y = 0; y < CH; y++) for (var x = 0; x < CH; x++) {
-      var tx = cx * CH + x, ty = cy * CH + y, sp = art.ground(S.terrain[W.idx(tx, ty)], gvar(tx, ty));
-      g.drawImage(sp.c, (x - y) * HW + CH * HW + 4 - sp.ox / sp.s, (x + y) * HH + 4 - sp.oy / sp.s, sp.w / sp.s, sp.h / sp.s);
+  function getChunk(L, cx, cy) {
+    var key = cx + cy * 64, c = L.map[key];
+    if (!c) {
+      c = L.map[key] = { c: document.createElement('canvas'), dirty: true, used: 0 };
+      c.c.width = Math.ceil((L.n * TW + 8) * L.sc); c.c.height = Math.ceil((L.n * TH + 28) * L.sc); chunkCount++;
+    }
+    c.used = frame;
+    if (c.dirty) paintChunk(L, c, cx, cy);
+    return c;
+  }
+  function paintChunk(L, c, cx, cy) {
+    var g = c.c.getContext('2d'), S = CB.sim.S, n = L.n, ox = n * HW + 4, oy = 4, x, y, tx, ty, sp;
+    g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, c.c.width, c.c.height); g.setTransform(L.sc, 0, 0, L.sc, 0, 0);
+    for (y = 0; y < n; y++) for (x = 0; x < n; x++) {
+      tx = cx * n + x; ty = cy * n + y; sp = art.ground(S.terrain[W.idx(tx, ty)], gvar(tx, ty));
+      g.drawImage(sp.c, (x - y) * HW + ox - sp.ox / sp.s, (x + y) * HH + oy - sp.oy / sp.s, sp.w / sp.s, sp.h / sp.s);
+    }
+    for (y = 0; y < n; y++) for (x = 0; x < n; x++) {
+      tx = cx * n + x; ty = cy * n + y; var ri = W.idx(tx, ty), rv = S.road[ri];
+      if (!rv) continue;
+      var m = (tx > 0 && S.road[ri - 1] ? 1 : 0) | (tx < N - 1 && S.road[ri + 1] ? 2 : 0) | (ty > 0 && S.road[ri - N] ? 4 : 0) | (ty < N - 1 && S.road[ri + N] ? 8 : 0);
+      sp = art.road(m, rv === 2);
+      g.drawImage(sp.c, (x - y) * HW + ox - sp.ox / sp.s, (x + y) * HH + oy - sp.oy / sp.s, sp.w / sp.s, sp.h / sp.s);
     }
     c.dirty = false;
-    return c;
+  }
+  function evictChunks() {
+    var m = LOD[1].map;
+    for (var k in m) if (m[k].used < frame - 180) { m[k].c.width = m[k].c.height = 0; delete m[k]; chunkCount--; }
   }
 
   function diamond(x0, y0, x1, y1) { // karo aralığının ekran dörtgeni (x1,y1 hariç)
@@ -105,7 +127,8 @@
   function updateCars(dt) {
     var S = CB.sim.S, conn = CB.sim.R.conn, i;
     if (roadDirty) {
-      roadList = []; for (i = 0; i < N * N; i++) if (S.road[i] && conn[i]) roadList.push(i);
+      roadList = []; badRoads = [];
+      for (i = 0; i < N * N; i++) if (S.road[i]) { if (conn[i]) roadList.push(i); else badRoads.push(i); }
       roadDirty = false;
     }
     var want = Math.min(70, Math.floor(roadList.length / 5), 4 + Math.floor(S.pop / 12));
@@ -195,8 +218,8 @@
       }
       return;
     }
-    drawSprite(sp, s[0], s[1]);
-    if (nf > 0.02) drawSprite(art.sprite(b.id, b.l, vr, true), s[0], s[1], nf);
+    if (nf >= 0.98) drawSprite(art.sprite(b.id, b.l, vr, true), s[0], s[1]);
+    else { drawSprite(sp, s[0], s[1]); if (nf > 0.02) drawSprite(art.sprite(b.id, b.l, vr, true), s[0], s[1], nf); }
     // animasyonlar
     if (ad.anim && z > 0.4) {
       var an = ad.anim, hx = s[0] + (an.u - an.v) * HW * z, hy = s[1] + (an.u + an.v) * HH * z - an.z * ZH * z, i, a;
@@ -261,23 +284,18 @@
     var mgx = 80 * z, mgy = 60 * z;
     function vis(sx, sy, up) { return sx > -mgx && sx < vw + mgx && sy > -mgy && sy < vh + mgy + (up || 0); }
 
+    var P = R.prof, t0 = P ? performance.now() : 0;
     // zemin
     ctx.imageSmoothingEnabled = true;
-    if (z * dpr <= 1.25) {
-      for (var cy = (y0 / CH) | 0; cy <= ((y1 / CH) | 0); cy++) for (var cx = (x0 / CH) | 0; cx <= ((x1 / CH) | 0); cx++) {
-        var ch = chunks[cx + cy * NCH];
-        if (!ch || ch.dirty) ch = buildChunk(cx, cy);
-        s = R.w2s(cx * CH, cy * CH);
-        ctx.drawImage(ch.c, s[0] - (CH * HW + 4) * z, s[1] - 4 * z, ch.c.width * z, ch.c.height * z);
-      }
-    } else {
-      for (y = y0; y <= y1; y++) for (x = x0; x <= x1; x++) {
-        s = R.w2s(x, y);
-        if (!vis(s[0], s[1])) continue;
-        var gs = art.ground(S.terrain[W.idx(x, y)], gvar(x, y)), k = z / gs.s;
-        ctx.drawImage(gs.c, s[0] - gs.ox * k, s[1] - gs.oy * k, gs.w * k, gs.h * k);
-      }
+    var L = z * dpr <= 1.2 ? LOD[0] : LOD[1], cn = L.n;
+    for (var cy = Math.floor(y0 / cn); cy <= Math.floor(y1 / cn); cy++) for (var cx = Math.floor(x0 / cn); cx <= Math.floor(x1 / cn); cx++) {
+      s = R.w2s(cx * cn, cy * cn);
+      if (s[0] + cn * HW * z < -8 || s[0] - cn * HW * z > vw + 8 || s[1] > vh + 8 || s[1] + (cn * TH + 28) * z < -8) continue;
+      var ch = getChunk(L, cx, cy);
+      ctx.drawImage(ch.c, s[0] - (cn * HW + 4) * z, s[1] - 4 * z, ch.c.width / L.sc * z, ch.c.height / L.sc * z);
     }
+    if (frame % 120 === 0) { roadDirty = true; if (chunkCount > 56) evictChunks(); }
+    if (P) { P.ground += performance.now() - t0; t0 = performance.now(); }
     // kilitli bölgeler
     var cost = R.expand ? CB.sim.regionCost() : 0, pulse = 0.5 + 0.5 * Math.sin(time * 4);
     for (i = 0; i < 64; i++) {
@@ -294,15 +312,13 @@
         ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,40,20,0.8)'; ctx.strokeText('₺' + CB.fmt(cost), s[0], s[1]); ctx.fillStyle = '#fff'; ctx.fillText('₺' + CB.fmt(cost), s[0], s[1]);
       }
     }
-    // yollar
-    for (y = y0; y <= y1; y++) for (x = x0; x <= x1; x++) {
-      var ri = W.idx(x, y), rv = S.road[ri];
-      if (!rv) continue;
-      s = R.w2s(x, y);
-      if (!vis(s[0], s[1])) continue;
-      var m = (x > 0 && S.road[ri - 1] ? 1 : 0) | (x < N - 1 && S.road[ri + 1] ? 2 : 0) | (y > 0 && S.road[ri - N] ? 4 : 0) | (y < N - 1 && S.road[ri + N] ? 8 : 0);
-      drawSprite(art.road(m, rv === 2), s[0], s[1]);
-      if (!SR.conn[ri] && frame % 60 < 40) { ctx.fillStyle = 'rgba(231,76,60,0.35)'; diamondFill(x, y, 1); }
+    // belediyeye bağlı olmayan yollar kırmızı yanıp söner
+    if (badRoads.length && frame % 60 < 40) {
+      ctx.fillStyle = 'rgba(231,76,60,0.4)';
+      for (i = 0; i < badRoads.length; i++) {
+        x = badRoads[i] % N; y = (badRoads[i] / N) | 0;
+        if (x >= x0 && x <= x1 && y >= y0 && y <= y1 && S.road[badRoads[i]]) diamondFill(x, y, 1);
+      }
     }
     // ısı haritası
     if (R.overlay && OVC[R.overlay]) {
@@ -334,6 +350,7 @@
       ctx.strokeStyle = 'rgba(255,255,255,' + (0.6 + 0.4 * pulse) + ')'; ctx.lineWidth = 2.5; diamond(R.sel.x, R.sel.y, R.sel.x + B[R.sel.id].size, R.sel.y + B[R.sel.id].size); ctx.stroke();
     }
 
+    if (P) { P.roads += performance.now() - t0; t0 = performance.now(); }
     // nesneler
     objs.length = 0;
     var seen = frame, mv = R.ghost && R.ghost.move;
@@ -359,12 +376,12 @@
       if (o.b) drawBuilding(o.b, time);
       else if (o.car) drawCar(o.car);
       else {
-        var ns = art.nature(o.t, gvar(o.x, o.y), false);
-        drawSprite(ns, o.sx, o.sy);
-        if (nf > 0.02) drawSprite(art.nature(o.t, gvar(o.x, o.y), true), o.sx, o.sy, nf);
+        if (nf >= 0.98) drawSprite(art.nature(o.t, gvar(o.x, o.y), true), o.sx, o.sy);
+        else { drawSprite(art.nature(o.t, gvar(o.x, o.y), false), o.sx, o.sy); if (nf > 0.02) drawSprite(art.nature(o.t, gvar(o.x, o.y), true), o.sx, o.sy, nf); }
       }
     }
 
+    if (P) { P.objs += performance.now() - t0; P.n += objs.length; t0 = performance.now(); }
     // duman
     for (i = smoke.length - 1; i >= 0; i--) {
       var p = smoke[i]; p.life -= dt * 0.45; p.y -= dt * 22; p.x += dt * 7; p.r += dt * 7;

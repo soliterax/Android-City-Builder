@@ -32,7 +32,8 @@
     var g = R.ghost; if (!g || g.x === null) return;
     var def = B[g.id], c = sim.canPlace(g.id, g.x, g.y, g.move);
     g.ok = c.ok; g.reason = c.ok ? '' : c.reason; g.trees = c.trees || 0;
-    if (c.ok && !g.move && !sim.canAfford(def.cost, g.trees * 15)) { g.ok = false; g.reason = 'Yetersiz kaynak'; }
+    var why = c.ok && !g.move ? sim.affordReason(def.cost, g.trees * 15) : '';
+    if (why) { g.ok = false; g.reason = why; }
     if (c.ok && !g.move && def.max && sim.totalOf(g.id) >= def.max) { g.ok = false; g.reason = 'En fazla ' + def.max + ' adet'; }
     CB.emit('ghost', {});
   };

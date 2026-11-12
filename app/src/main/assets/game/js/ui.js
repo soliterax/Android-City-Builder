@@ -411,7 +411,7 @@
     var res = '';
     D.RES_ORDER.forEach(function (r) { if (Math.abs(o.res[r]) >= 1) res += '<span>' + D.RES[r].icon + ' ' + (o.res[r] > 0 ? '+' : '') + CB.fmt(o.res[r]) + '</span> '; });
     ui.popup('<div class="big">🌙</div><h2>Tekrar hoş geldin!</h2><p>Sen yokken şehrin <b>' + CB.fmtTime(o.sec) + '</b> boyunca çalıştı' + (o.capped ? ' (üst sınır)' : '') + '. Verim: %' + Math.round(o.eff * 100) + '</p>' +
-      '<div class="gain">' + (o.money >= 0 ? '+' : '-') + '₺' + CB.fmt(Math.abs(o.money)) + '</div>' + (res ? '<p class="rew" style="justify-content:center">' + res + '</p>' : '') +
+      '<div class="gain">+₺' + CB.fmt(Math.max(0, o.money)) + '</div>' + (res ? '<p class="rew" style="justify-content:center">' + res + '</p>' : '') +
       (o.sci >= 1 ? '<p>🔬 +' + CB.fmt(o.sci) + ' bilim</p>' : '') + (o.done ? '<p>🏗️ ' + o.done + ' inşaat tamamlandı</p>' : ''), [['Harika!', 'green']]);
   };
 
@@ -541,12 +541,7 @@
       if (R.sel === b) renderInfo();
       if (buildOpen()) renderCards();
     });
-    CB.on('levelup', function (e) {
-      CB.emit('sfx', 'level'); CB.emit('haptic', 40);
-      var u = e.unlocks.map(function (id) { return '<div><img src="' + art.thumb(id) + '">' + B[id].name + '</div>'; }).join('');
-      ui.popup('<div class="big">⭐</div><h2>Seviye ' + e.lvl + '!</h2><div class="gain">+₺' + CB.fmt(e.reward) + '</div>' + (u ? '<p>Yeni binalar açıldı:</p><div class="unl">' + u + '</div>' : '<p>Şehrin büyümeye devam ediyor!</p>'));
-      if (buildOpen()) renderCards();
-    });
+    CB.on('levelup', function (e) { lvlQ.push(e); });
     CB.on('missionDone', function () { CB.emit('sfx', 'coin'); ui.toast('🎁 Görev tamamlandı! Ödülünü al.', 'good'); });
     CB.on('ach', function (e) { ui.toast('🏅 Başarım: ' + e.a.name + ' (+' + CB.fmt(e.a.xp) + ' XP)', 'good'); });
     CB.on('tech', function () { if (buildOpen()) renderCards(); });
@@ -566,8 +561,20 @@
   };
 
   /* periyodik yenileme (saniyede ~2) */
-  var pressing = false;
+  var pressing = false, lvlQ = [];
+  /* art arda gelen seviye atlamalarını tek pencerede göster */
+  function flushLevels() {
+    if (!lvlQ.length) return;
+    var last = lvlQ[lvlQ.length - 1], rew = 0, ids = [];
+    lvlQ.forEach(function (e) { rew += e.reward; ids = ids.concat(e.unlocks); });
+    lvlQ = [];
+    CB.emit('sfx', 'level'); CB.emit('haptic', 40);
+    var u = ids.slice(0, 12).map(function (id) { return '<div><img src="' + art.thumb(id) + '">' + B[id].name + '</div>'; }).join('');
+    ui.popup('<div class="big">⭐</div><h2>Seviye ' + last.lvl + '!</h2><div class="gain">+₺' + CB.fmt(rew) + '</div>' + (u ? '<p>Yeni binalar açıldı:</p><div class="unl">' + u + '</div>' : '<p>Şehrin büyümeye devam ediyor!</p>'));
+    if (buildOpen()) renderCards();
+  }
   ui.refresh = function () {
+    flushLevels();
     if (pressing) return;
     ui.hud();
     if (R.sel && !el.info.classList.contains('hidden')) renderInfo();

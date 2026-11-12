@@ -247,6 +247,9 @@
   m('Tüm Harita', '64 bölgenin tamamına sahip ol.', { t: 'reg', n: 64 }, { money: 10000000, xp: 100000 });
   m('Yıldızlara Doğru', 'Uzay Üssü\'nü inşa et!', { t: 'b', id: 'spaceport', n: 1 }, { money: 25000000, xp: 200000 });
 
+  // ilk görevlerde ödül cömert olsun: oyunun başı akıcı ilerlesin
+  for (var mi = 0; mi < 12; mi++) M[mi].rew.money *= 2;
+
   /* ---------- BAŞARIMLAR ---------- */
   var A = D.ACH = [];
   function a(id, name, desc, stat, n, xp) { A.push({ id: id, name: name, desc: desc, stat: stat, n: n, xp: xp }); }

@@ -67,6 +67,12 @@
     if (!cost.money && extraMoney && S.money < extraMoney) return false;
     return true;
   };
+  /* boş dize = karşılanabilir; aksi halde neden */
+  sim.affordReason = function (cost, extraMoney) {
+    var cap = sim.storageCap();
+    for (var r in cost) if (r !== 'money' && cost[r] > cap && S.res[r] < cost[r]) return 'Depo kapasitesi yetersiz (' + D.RES[r].icon + ' ' + CB.fmt(cost[r]) + ' gerekli). Depo kur!';
+    return sim.canAfford(cost, extraMoney) ? '' : 'Yetersiz kaynak';
+  };
   function pay(cost) {
     for (var r in cost) { if (r === 'money') S.money -= cost.money; else S.res[r] -= cost[r]; }
   }
@@ -159,7 +165,8 @@
     var c = sim.canPlace(id, x, y);
     if (!c.ok) return c;
     var extra = c.trees * 15;
-    if (!sim.canAfford(def.cost, extra)) return { ok: false, reason: 'Yetersiz kaynak' };
+    var why = sim.affordReason(def.cost, extra);
+    if (why) return { ok: false, reason: why };
     pay(def.cost); S.money -= extra;
     if (c.trees) S.res.wood = Math.min(Math.max(sim.storageCap(), S.res.wood), S.res.wood + c.trees * 3);
     var i, dx, dy;
@@ -245,7 +252,8 @@
     if (b.st) return { ok: false, reason: 'Bina meşgul' };
     if (b.dmg) return { ok: false, reason: 'Önce onar' };
     if (info.need > S.lvl) return { ok: false, reason: 'Şehir seviyesi ' + info.need + ' gerekli' };
-    if (!sim.canAfford(info.cost)) return { ok: false, reason: 'Yetersiz kaynak' };
+    var why = sim.affordReason(info.cost);
+    if (why) return { ok: false, reason: why };
     pay(info.cost);
     b.st = 2; b.q = info.time; b.tot = info.time; R.dirty = true;
     return { ok: true };
@@ -480,7 +488,7 @@
     var m0 = S.money, res0 = {}, sci0 = S.sci;
     for (r in S.res) res0[r] = S.res[r];
     var cap = tot.stor, taxInc = 0, comInc = 0, upk = 0, pop = 0;
-    var taxK = 2 * (S.tax / 10) * (1 + m.tax);
+    var taxK = 2.5 * (S.tax / 10) * (1 + m.tax);
 
     for (i = 0; i < S.bl.length; i++) {
       b = S.bl[i]; def = B[b.id]; li = b.l - 1;
@@ -797,6 +805,7 @@
     var out = { sec: el, capped: sec > el, eff: eff, res: {}, done: S.stats.built + S.stats.upgrades - built0 };
     var dm = S.money - m0;
     if (dm > 0) { S.money = m0 + dm * eff; S.stats.earned = earned0 + (S.stats.earned - earned0) * eff; }
+    else S.money = m0; // yokken kasa erimez
     out.money = S.money - m0;
     for (r in S.res) { var d = S.res[r] - res0[r]; if (d > 0) { S.res[r] = res0[r] + d * eff; } out.res[r] = S.res[r] - res0[r]; }
     var ds = S.sci - sci0; if (ds > 0) S.sci = sci0 + ds * eff;
