@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#16324a">
+<title>Kent Ustası</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<div id="hud">
+  <div id="top">
+    <div class="chip lvl" data-act="panel" data-arg="city">
+      <span class="star">★</span><b id="h-lvl">1</b>
+      <div class="xpbar"><i id="h-xp"></i></div>
+    </div>
+    <div class="chip grow" data-act="panel" data-arg="city:budget">
+      <span>💰</span><div class="mcol"><b id="h-money">0</b><small id="h-mrate"></small></div>
+    </div>
+    <div class="chip" data-act="panel" data-arg="city"><span>👥</span><b id="h-pop">0</b></div>
+    <div class="chip" data-act="overlay" data-arg="happy"><span id="h-face">😊</span><b id="h-happy">50</b></div>
+  </div>
+  <div id="top2" data-act="panel" data-arg="city:store"></div>
+
+  <div id="mission" data-act="panel" data-arg="missions"></div>
+  <div id="effects"></div>
+
+  <div id="side">
+    <button class="sbtn" id="b-speed" data-act="speed">▶</button>
+    <button class="sbtn" id="b-overlay" data-act="overlayMenu">👁️</button>
+    <button class="sbtn" id="b-expand" data-act="expand">🧭</button>
+    <button class="sbtn" data-act="home">🏛️</button>
+  </div>
+  <div id="ovmenu" class="hidden"></div>
+  <div id="toasts"></div>
+
+  <div id="info" class="hidden"></div>
+  <div id="placebar" class="hidden"></div>
+  <div id="buildbar" class="hidden">
+    <div id="cats"></div>
+    <div id="cards"></div>
+  </div>
+
+  <div id="bottom">
+    <button class="bbtn main" data-act="build"><span>🏗️</span><em>İnşa</em></button>
+    <button class="bbtn" data-act="panel" data-arg="missions"><span>📋</span><em>Görev</em><i class="dot" id="d-missions"></i></button>
+    <button class="bbtn" data-act="panel" data-arg="research"><span>🔬</span><em>Bilim</em><i class="dot" id="d-research"></i></button>
+    <button class="bbtn" data-act="panel" data-arg="trade"><span>🚢</span><em>Ticaret</em><i class="dot" id="d-trade"></i></button>
+    <button class="bbtn" data-act="panel" data-arg="city"><span>🏙️</span><em>Şehir</em></button>
+    <button class="bbtn" data-act="panel" data-arg="menu"><span>⚙️</span><em>Menü</em></button>
+  </div>
+</div>
+
+<div id="modal" class="hidden">
+  <div class="sheet">
+    <header><h2 id="m-title"></h2><button class="x" data-act="close">✕</button></header>
+    <div class="tabs" id="m-tabs"></div>
+    <div class="body" id="m-body"></div>
+  </div>
+</div>
+<div id="popup" class="hidden"><div class="pbox" id="p-box"></div></div>
+<div id="loading"><div class="logo">🏙️</div><h1>Kent Ustası</h1><p>Şehir kuruluyor…</p></div>
+
+<script src="js/util.js"></script>
+<script src="js/data.js"></script>
+<script src="js/world.js"></script>
+<script src="js/sim.js"></script>
+<script src="js/art.js"></script>
+<script src="js/render.js"></script>
+<script src="js/input.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/save.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
